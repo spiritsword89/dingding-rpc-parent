@@ -1,5 +1,8 @@
 package com.dingding.server;
 
+import com.dingding.handler.JsonCallMessageEncoder;
+import com.dingding.handler.JsonMessageDecoder;
+import com.dingding.handler.RpcServerMessageHandler;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -63,10 +66,13 @@ public class RpcServer {
             serverBootstrap.group(boss,worker)
                     .channel(NioServerSocketChannel.class)
                     .option(ChannelOption.SO_BACKLOG, backlogSize)
-                    .childOption(ChannelOption.SO_KEEPALIVE,true).childHandler(new ChannelInitializer<SocketChannel>() {
+                    .childOption(ChannelOption.SO_KEEPALIVE,true)
+                    .childHandler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
-
+                            socketChannel.pipeline().addLast(new JsonMessageDecoder());
+                            socketChannel.pipeline().addLast(new JsonCallMessageEncoder());
+                            socketChannel.pipeline().addLast(new RpcServerMessageHandler());
                         }
                     });
             ChannelFuture channelFuture = serverBootstrap.bind(port).sync();
