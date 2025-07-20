@@ -17,7 +17,8 @@ public class RpcMethodDescriptor {
         RpcMethodDescriptor md = new RpcMethodDescriptor();
 
         Class<?>[] paramTypes = method.getParameterTypes();
-        md.setClassName(method.getClass().getName());
+
+        md.setClassName(method.getDeclaringClass().getName());
         md.setNumOfParams(method.getParameterCount());
         md.setMethodName(method.getName());
 

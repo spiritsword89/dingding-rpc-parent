@@ -11,6 +11,8 @@ public class DingdingUserDetailImpl implements UserDetailService {
     @Autowired
     private BookingDetailService bookingDetailService;
 
+    // 代理对象： 内部是通过Netty的Channel发送请求到生产者进行方法调用，产生的结果原路返回
+
     @Override
     public void checkUser() {
         bookingDetailService.getBookingByUserId(1);

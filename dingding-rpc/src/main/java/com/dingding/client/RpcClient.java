@@ -1,6 +1,11 @@
 package com.dingding.client;
 
+import com.dingding.handler.JsonCallMessageEncoder;
+import com.dingding.handler.JsonMessageDecoder;
+import com.dingding.handler.RpcClientMessageHandler;
 import com.dingding.model.MarkAsRpc;
+import com.dingding.model.MessagePayload;
+import com.dingding.model.MessageType;
 import com.dingding.model.RpcMethodDescriptor;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -18,11 +23,16 @@ import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AssignableTypeFilter;
 
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 // 自定义注解 放在其他服务上， SpringbootApplication
+// 自定义注解，clientId, basePackages
 
 // 处理RPC请求
 // 1. 发现RPC服务
@@ -30,6 +40,7 @@ import java.util.*;
 // 扫描支持RPC的所有方法
 
 // 创建并发送RPC请求
+
 public class RpcClient implements SmartInitializingSingleton {
     private static final Logger logger =  LoggerFactory.getLogger(RpcClient.class);
 
@@ -45,6 +56,8 @@ public class RpcClient implements SmartInitializingSingleton {
 
     private Map<String, Method> reflectedMethodMap = new HashMap<>();
 
+    private Map<String, CompletableFuture<MessagePayload.RpcResponse>> requestMap = new ConcurrentHashMap<>();
+
     @Value("${dingding.rpc.server.host}")
     private String host;
 
@@ -53,7 +66,24 @@ public class RpcClient implements SmartInitializingSingleton {
 
     @PostConstruct
     public void initialize() {
-        new Thread(this::connect).start();
+        System.out.println("Rpc Client 启动");
+//        new Thread(this::connect).start();
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
+    }
+
+    public String[] getScanPackages() {
+        return scanPackages;
+    }
+
+    public void setScanPackages(String[] scanPackages) {
+        this.scanPackages = scanPackages;
     }
 
     public void connect() {
@@ -65,7 +95,12 @@ public class RpcClient implements SmartInitializingSingleton {
                     .handler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
-
+                            socketChannel.pipeline().addLast(new JsonCallMessageEncoder());
+                            socketChannel.pipeline().addLast(new JsonMessageDecoder());
+                            //假设已经有了Handler接收返回的结果
+                            //1. 处理返回结果
+                            //2. 处理接收到的请求
+                            socketChannel.pipeline().addLast(new RpcClientMessageHandler(RpcClient.this));
                         }
                     });
 
@@ -90,6 +125,51 @@ public class RpcClient implements SmartInitializingSingleton {
 
     public void reconnect() {
 
+    }
+
+    public void completeRequest(MessagePayload.RpcResponse rpcResponse) {
+        String requestId = rpcResponse.getRequestId();
+        CompletableFuture<MessagePayload.RpcResponse> rpcResponseCompletableFuture = requestMap.get(requestId);
+        rpcResponseCompletableFuture.complete(rpcResponse);
+    }
+
+    @SuppressWarnings("all")
+    public <T> T generateProxy(Class<T> proxyClass, String requestClientId) {
+        return (T) Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(), new Class[]{proxyClass}, new InvocationHandler() {
+            @Override
+            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                int paramCounts = args.length;
+                String[] paramTypes = new String[paramCounts];
+
+                for(int i = 0; i < paramCounts; i++) {
+                    paramTypes[i] = args[i].getClass().getSimpleName();
+                }
+
+                String requestId = UUID.randomUUID().toString();
+
+                MessagePayload message = new MessagePayload.MessageBuilder()
+                        .setClientId(clientId)
+                        .setRequestClientId(requestClientId)
+                        .setRequestId(requestId)
+                        .setMessageType(MessageType.CALL)
+                        .setParamTypes(paramTypes)
+                        .setParams(args)
+                        .setRequestMethodName(method.getName())
+                        .setRequestedClassName(proxyClass.getName()).build();
+
+                CompletableFuture<MessagePayload.RpcResponse> future = new CompletableFuture<>();
+
+                requestMap.put(requestId, future);
+
+                channel.writeAndFlush(message); //发送RPC请求到服务端
+
+                MessagePayload.RpcResponse rpcResponse = future.get();
+
+                requestMap.remove(requestId);
+
+                return rpcResponse.getReturnValue();
+            }
+        });
     }
 
     @Override
