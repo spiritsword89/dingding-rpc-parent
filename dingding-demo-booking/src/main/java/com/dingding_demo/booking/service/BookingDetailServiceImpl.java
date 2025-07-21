@@ -12,7 +12,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     @MarkAsRpc
     @Override
     public Object getBookingByUserId(int userId) {
-        return "Hello I am booking service";
+        return "Hello I am booking service, this is my id: " + userId;
     }
 
     @Override

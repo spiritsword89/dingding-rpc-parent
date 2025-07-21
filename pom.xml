@@ -13,6 +13,7 @@
         <module>dingding-demo-common</module>
         <module>dingding-demo-user</module>
         <module>dingding-demo-booking</module>
+        <module>dingding-demo-server</module>
     </modules>
 
     <parent>

@@ -33,6 +33,12 @@ public class RpcClientMessageHandler extends SimpleChannelInboundHandler<Message
         }
     }
 
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        super.channelInactive(ctx);
+        rpcClient.reconnect();
+    }
+
     private void completeRequest(MessagePayload messagePayload) {
         //调用CompletableFuture complete
         MessagePayload.RpcResponse response = (MessagePayload.RpcResponse) messagePayload.getPayload();
@@ -40,6 +46,10 @@ public class RpcClientMessageHandler extends SimpleChannelInboundHandler<Message
     }
 
     private void processRequestAndGenerateResponse(MessagePayload messagePayload) {
-
+        try {
+            rpcClient.processRequest(messagePayload);
+        } catch (NoSuchMethodException e) {
+            logger.error(e.getMessage(),e);
+        }
     }
 }

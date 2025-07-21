@@ -8,8 +8,13 @@ import com.dingding.server.ClientSessionManager;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.util.AttributeKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RpcServerMessageHandler extends SimpleChannelInboundHandler<MessagePayload> {
+    private static final Logger logger =  LoggerFactory.getLogger(RpcServerMessageHandler.class);
+
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, MessagePayload messagePayload) throws Exception {
         MessageType messageType = messagePayload.getMessageType();
@@ -50,7 +55,7 @@ public class RpcServerMessageHandler extends SimpleChannelInboundHandler<Message
 
         //Channel: 请求方的Channel
         Channel channel = ClientSessionManager.getClientChannel(clientId);
-        channel.writeAndFlush(response);
+        channel.writeAndFlush(messagePayload);
     }
 
     private void forwardRequestToClient(MessagePayload messagePayload, Channel channel) {
@@ -61,10 +66,13 @@ public class RpcServerMessageHandler extends SimpleChannelInboundHandler<Message
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        super.channelInactive(ctx);
+        String clientId = ctx.channel().attr(AttributeKey.valueOf("clientId")).get().toString();
+        ClientSessionManager.clearByClientId(clientId);
     }
 
     private void registerClientIntoSession(MessagePayload messagePayload, Channel channel) {
+        logger.info("Client id {} is now registering with Netty Server",  messagePayload.getClientId());
         ClientSessionManager.register(messagePayload.getClientId(), channel);
+        channel.attr(AttributeKey.valueOf("clientId")).set(messagePayload.getClientId());
     }
 }

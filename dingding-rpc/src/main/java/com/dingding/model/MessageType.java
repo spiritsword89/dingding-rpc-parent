@@ -5,4 +5,5 @@ public enum MessageType {
     CALL,
     FORWARD,
     RESPONSE,
+    HEART_BEAT
 }
