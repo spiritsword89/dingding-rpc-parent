@@ -1,4 +1,5 @@
 package com.dingding_demo.user.service;
+import com.dingding.config.AutoRemoteInjection;
 import com.dingding_demo.common.booking.BookingDetailService;
 import com.dingding_demo.common.user.UserDetailService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,7 @@ public class DingdingUserDetailImpl implements UserDetailService {
 
     @Override
     public String checkUser() {
+        System.out.println("Hello");
         return bookingDetailService.getBookingByUserId(1).toString();
     }
 }

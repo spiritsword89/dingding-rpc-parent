@@ -74,6 +74,10 @@ public class RpcClient implements SmartInitializingSingleton, ApplicationContext
     @Value("${dingding.rpc.server.port}")
     private Integer port;
 
+    private int retryCount = 0;
+
+    private int maxRetryCount;
+
     @PostConstruct
     public void initialize() {
         System.out.println("Rpc Client 启动");
@@ -116,24 +120,22 @@ public class RpcClient implements SmartInitializingSingleton, ApplicationContext
                         }
                     });
 
-            ChannelFuture cf = bootstrap.connect(host, port).addListener(future -> {
+            bootstrap.connect(host, port).addListener(future -> {
                 if (future.isSuccess()) {
                     logger.info("Client ID: {} 连接成功", clientId);
                     ChannelFuture channelFuture = (ChannelFuture) future;
                     this.channel = channelFuture.channel();
                     sendRegistrationRequest();
+
+                    channelFuture.channel().closeFuture().sync();
                 } else {
                     System.out.println("Failed to connect server");
                     reconnect();
                 }
             });
-
-            cf.channel().closeFuture().sync();
         }catch (Exception e){
             logger.error(e.getMessage(),e);
             throw new RuntimeException();
-        }finally {
-            workerGroup.shutdownGracefully();
         }
     }
 
@@ -144,6 +146,11 @@ public class RpcClient implements SmartInitializingSingleton, ApplicationContext
     public void sendRegistrationRequest() {
         MessagePayload msg = new MessagePayload.MessageBuilder().setClientId(this.clientId).setMessageType(MessageType.REGISTER).build();
         this.channel.writeAndFlush(msg);
+    }
+
+    public void sendRequest(Object request, String requestId, CompletableFuture<MessagePayload.RpcResponse> future) {
+        this.requestMap.put(requestId, future);
+        channel.writeAndFlush(request); //发送RPC请求到服务端
     }
 
     public void processRequest(MessagePayload messagePayload) throws NoSuchMethodException {
@@ -218,50 +225,7 @@ public class RpcClient implements SmartInitializingSingleton, ApplicationContext
         String requestId = rpcResponse.getRequestId();
         CompletableFuture<MessagePayload.RpcResponse> rpcResponseCompletableFuture = requestMap.get(requestId);
         rpcResponseCompletableFuture.complete(rpcResponse);
-    }
-
-    @SuppressWarnings("all")
-    public <T> T generateProxy(Class<T> proxyClass, String requestClientId) {
-        return (T) Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(), new Class[]{proxyClass}, new InvocationHandler() {
-            @Override
-            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-                int paramCounts = args.length;
-                String[] paramTypes = new String[paramCounts];
-
-                Class<?>[] parameterTypes = method.getParameterTypes();
-                for(int i = 0; i < parameterTypes.length; i++) {
-                    paramTypes[i] = parameterTypes[i].getSimpleName();
-                }
-
-                String requestId = UUID.randomUUID().toString();
-
-                MessagePayload message = new MessagePayload.MessageBuilder()
-                        .setClientId(clientId)
-                        .setRequestClientId(requestClientId)
-                        .setRequestId(requestId)
-                        .setMessageType(MessageType.CALL)
-                        .setParamTypes(paramTypes)
-                        .setParams(args)
-                        .setRequestMethodName(method.getName())
-                        .setReturnValueType(method.getReturnType().getSimpleName())
-                        .setRequestedClassName(proxyClass.getName()).build();
-
-                CompletableFuture<MessagePayload.RpcResponse> future = new CompletableFuture<>();
-
-                requestMap.put(requestId, future);
-
-                channel.writeAndFlush(message); //发送RPC请求到服务端
-
-                try {
-                    MessagePayload.RpcResponse rpcResponse = future.get(5, TimeUnit.SECONDS);
-                    requestMap.remove(requestId);
-                    return rpcResponse.getReturnValue();
-                }catch (Exception e){
-                    logger.error(e.getMessage(),e);
-                    return "超时！";
-                }
-            }
-        });
+        this.requestMap.remove(requestId);
     }
 
     @Override
