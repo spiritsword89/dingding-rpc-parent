@@ -1,19 +1,14 @@
-package com.dingding_demo.booking.service;
+package com.dingding_demo.user.service;
 
-import com.dingding.model.MarkAsRpc;
 import com.dingding_demo.common.booking.BookingDetailService;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-@Component
-public class BookingDetailServiceImpl implements BookingDetailService {
+public class BookingServiceFallBack implements BookingDetailService {
 
-    @MarkAsRpc
     @Override
     public Object getBookingByUserId(int userId) {
-        //token
-        return "Hello I am booking service, this is my id: " + userId;
+        return "Fallback When Proxy Fails";
     }
 
     @Override

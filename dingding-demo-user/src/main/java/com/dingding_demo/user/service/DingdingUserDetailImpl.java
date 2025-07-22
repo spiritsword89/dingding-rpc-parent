@@ -15,6 +15,7 @@ public class DingdingUserDetailImpl implements UserDetailService {
 
     @Override
     public String checkUser() {
+        // token
         System.out.println("Hello");
         return bookingDetailService.getBookingByUserId(1).toString();
     }

@@ -1,5 +1,6 @@
 package com.dingding.config;
 
+import com.dingding.client.RemoteClient;
 import com.dingding.client.RpcClient;
 import com.dingding.model.MessagePayload;
 import com.dingding.model.MessageType;
@@ -18,7 +19,17 @@ public class RemoteServiceFactoryBean<T> implements FactoryBean<T> {
 
     private Class<T> rpcInterfaceClass;
 
-    private RpcClient rpcClient;
+    private Class<? extends T> fallbackClass;
+
+    private RemoteClient remoteClient;
+
+    public Class<? extends T> getFallbackClass() {
+        return fallbackClass;
+    }
+
+    public void setFallbackClass(Class<? extends T> fallbackClass) {
+        this.fallbackClass = fallbackClass;
+    }
 
     public RemoteServiceFactoryBean(Class<T> rpcInterfaceClass) {
         this.rpcInterfaceClass = rpcInterfaceClass;
@@ -40,12 +51,12 @@ public class RemoteServiceFactoryBean<T> implements FactoryBean<T> {
         this.rpcInterfaceClass = rpcInterfaceClass;
     }
 
-    public RpcClient getRpcClient() {
-        return rpcClient;
+    public RemoteClient getRemoteClient() {
+        return remoteClient;
     }
 
-    public void setRpcClient(RpcClient rpcClient) {
-        this.rpcClient = rpcClient;
+    public void setRemoteClient(RemoteClient remoteClient) {
+        this.remoteClient = remoteClient;
     }
 
     @Override
@@ -65,7 +76,7 @@ public class RemoteServiceFactoryBean<T> implements FactoryBean<T> {
                 String requestId = UUID.randomUUID().toString();
 
                 MessagePayload message = new MessagePayload.MessageBuilder()
-                        .setClientId(rpcClient.getClientId())
+                        .setClientId(remoteClient.clientId())
                         .setRequestClientId(requestClientId)
                         .setRequestId(requestId)
                         .setMessageType(MessageType.CALL)
@@ -77,12 +88,17 @@ public class RemoteServiceFactoryBean<T> implements FactoryBean<T> {
 
                 CompletableFuture<MessagePayload.RpcResponse> future = new CompletableFuture<>();
 
-                rpcClient.sendRequest(message, requestId, future);
+                remoteClient.sendRequest(message, requestId, future);
 
                 try {
                     MessagePayload.RpcResponse rpcResponse = future.get(5, TimeUnit.SECONDS);
+                    remoteClient.didCatchResponse(rpcResponse, requestId);
                     return rpcResponse.getReturnValue();
                 }catch (Exception e){
+                    if(fallbackClass != null){
+                        Object fallbackBean = fallbackClass.getConstructor().newInstance();
+                        return fallbackClass.getMethod(method.getName(), method.getParameterTypes()).invoke(fallbackBean, args);
+                    }
                     return "超时！";
                 }
             }

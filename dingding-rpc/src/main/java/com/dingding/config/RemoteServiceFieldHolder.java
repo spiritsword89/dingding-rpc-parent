@@ -8,6 +8,7 @@ public class RemoteServiceFieldHolder {
     private String requestClientId;
     private String fieldClassName;
     private String alias;
+    private Class<?> fallbackClass;
 
     public RemoteServiceFieldHolder(Field remoteServiceField, String requestClientId) {
         this.remoteServiceField = remoteServiceField;
@@ -32,6 +33,14 @@ public class RemoteServiceFieldHolder {
         }
 
         return this.fieldClassName.equals(holder.fieldClassName);
+    }
+
+    public Class<?> getFallbackClass() {
+        return fallbackClass;
+    }
+
+    public void setFallbackClass(Class<?> fallbackClass) {
+        this.fallbackClass = fallbackClass;
     }
 
     public Field getRemoteServiceField() {
