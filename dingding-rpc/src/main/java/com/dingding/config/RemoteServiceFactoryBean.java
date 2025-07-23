@@ -1,12 +1,14 @@
 package com.dingding.config;
 
 import com.dingding.client.RemoteClient;
+import com.dingding.client.RemoteService;
 import com.dingding.client.RpcClient;
 import com.dingding.model.MessagePayload;
 import com.dingding.model.MessageType;
 import org.springframework.beans.factory.FactoryBean;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.UUID;
@@ -75,6 +77,12 @@ public class RemoteServiceFactoryBean<T> implements FactoryBean<T> {
 
                 String requestId = UUID.randomUUID().toString();
 
+                Class<?> remoteRpcInterface = getRemoteRpcInterface(rpcInterfaceClass);
+
+                if(remoteRpcInterface == null) {
+                    return triggerCallback(method, args);
+                }
+
                 MessagePayload message = new MessagePayload.MessageBuilder()
                         .setClientId(remoteClient.clientId())
                         .setRequestClientId(requestClientId)
@@ -84,7 +92,7 @@ public class RemoteServiceFactoryBean<T> implements FactoryBean<T> {
                         .setParams(args)
                         .setRequestMethodName(method.getName())
                         .setReturnValueType(method.getReturnType().getSimpleName())
-                        .setRequestedClassName(rpcInterfaceClass.getName()).build();
+                        .setRequestedClassName(remoteRpcInterface.getName()).build();
 
                 CompletableFuture<MessagePayload.RpcResponse> future = new CompletableFuture<>();
 
@@ -95,14 +103,33 @@ public class RemoteServiceFactoryBean<T> implements FactoryBean<T> {
                     remoteClient.didCatchResponse(rpcResponse, requestId);
                     return rpcResponse.getReturnValue();
                 }catch (Exception e){
-                    if(fallbackClass != null){
-                        Object fallbackBean = fallbackClass.getConstructor().newInstance();
-                        return fallbackClass.getMethod(method.getName(), method.getParameterTypes()).invoke(fallbackBean, args);
-                    }
-                    return "超时！";
+                    return triggerCallback(method, args);
                 }
             }
         });
+    }
+
+    private Class<?> getRemoteRpcInterface(Class<?> targetInterface) {
+        for(Class<?> interfaceClass : targetInterface.getInterfaces()) {
+            if(interfaceClass.equals(RemoteService.class)) {
+                return targetInterface;
+            }
+            Class<?> found = getRemoteRpcInterface(interfaceClass);
+            if(found != null) {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    private Object triggerCallback(Method method, Object[] args) throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
+        if(fallbackClass != null){
+            Object fallbackBean = fallbackClass.getConstructor().newInstance();
+            return fallbackClass.getMethod(method.getName(), method.getParameterTypes()).invoke(fallbackBean, args);
+        }
+
+        return null;
     }
 
     @Override

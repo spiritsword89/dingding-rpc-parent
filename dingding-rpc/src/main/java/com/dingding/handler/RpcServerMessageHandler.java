@@ -19,7 +19,6 @@ public class RpcServerMessageHandler extends SimpleChannelInboundHandler<Message
     protected void channelRead0(ChannelHandlerContext ctx, MessagePayload messagePayload) throws Exception {
         MessageType messageType = messagePayload.getMessageType();
 
-        Thread.sleep(8000);
         if(messageType.equals(MessageType.REGISTER)) {
             //把客户端的信息记录下来
             registerClientIntoSession(messagePayload, ctx.channel());

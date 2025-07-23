@@ -5,6 +5,6 @@ import com.dingding_demo.common.booking.BookingDetailService;
 
 public class UserSecurityService {
 
-    @AutoRemoteInjection(requestClientId = "demo-security")
-    private BookingDetailService bookingDetailService;
+//    @AutoRemoteInjection(requestClientId = "demo-security")
+//    private BookingDetailService bookingDetailService;
 }
