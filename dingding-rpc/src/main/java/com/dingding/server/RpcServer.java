@@ -1,9 +1,6 @@
 package com.dingding.server;
 
-import com.dingding.handler.JsonCallMessageEncoder;
-import com.dingding.handler.JsonMessageDecoder;
-import com.dingding.handler.RpcServerMessageHandler;
-import com.dingding.handler.ServerHeartbeatHandler;
+import com.dingding.handler.*;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -72,8 +69,10 @@ public class RpcServer {
                     .childHandler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
-                            socketChannel.pipeline().addLast(new JsonMessageDecoder());
-                            socketChannel.pipeline().addLast(new JsonCallMessageEncoder());
+//                            socketChannel.pipeline().addLast(new JsonMessageDecoder());
+//                            socketChannel.pipeline().addLast(new JsonCallMessageEncoder());
+                            socketChannel.pipeline().addLast(new KryoCallMessageEncoder());
+                            socketChannel.pipeline().addLast(new KryoMessageDecoder());
                             socketChannel.pipeline().addLast(new IdleStateHandler(10, 0, 10));
                             socketChannel.pipeline().addLast(new ServerHeartbeatHandler());
                             socketChannel.pipeline().addLast(new RpcServerMessageHandler());

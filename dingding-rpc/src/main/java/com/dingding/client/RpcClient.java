@@ -1,10 +1,7 @@
 package com.dingding.client;
 
 import com.dingding.exceptions.RequestClassNotDetermineException;
-import com.dingding.handler.ClientHeartbeatHandler;
-import com.dingding.handler.JsonCallMessageEncoder;
-import com.dingding.handler.JsonMessageDecoder;
-import com.dingding.handler.RpcClientMessageHandler;
+import com.dingding.handler.*;
 import com.dingding.model.MarkAsRpc;
 import com.dingding.model.MessagePayload;
 import com.dingding.model.MessageType;
@@ -74,8 +71,10 @@ public class RpcClient extends RemoteClientTemplate {
                     .handler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
-                            socketChannel.pipeline().addLast(new JsonCallMessageEncoder());
-                            socketChannel.pipeline().addLast(new JsonMessageDecoder());
+//                            socketChannel.pipeline().addLast(new JsonCallMessageEncoder());
+//                            socketChannel.pipeline().addLast(new JsonMessageDecoder());
+                            socketChannel.pipeline().addLast(new KryoCallMessageEncoder());
+                            socketChannel.pipeline().addLast(new KryoMessageDecoder());
                             socketChannel.pipeline().addLast(new IdleStateHandler(0, 5, 0));
                             socketChannel.pipeline().addLast(new ClientHeartbeatHandler());
                             //假设已经有了Handler接收返回的结果
